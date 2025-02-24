@@ -46,7 +46,16 @@ def call_gemini_api(prompt):
         st.error(f"Error al conectar con la API: {response.status_code}")
         return None
 
-# --- Sección de carga de datos ---
+# --- Barra lateral con instrucciones y carga de datos ---
+st.sidebar.header("Instrucciones de Uso")
+st.sidebar.markdown("""
+1. **Carga tus datos**: Usa el selector de archivos abajo para subir un CSV con columnas `Drug_Name` y `Sales_2024 (USD)`.
+2. **Filtra por ventas**: Ajusta los sliders para ver medicamentos dentro de un rango de ventas específico.
+3. **Selecciona un medicamento**: Usa el menú desplegable en la sección principal para elegir un medicamento y ver sus detalles.
+4. **Analiza con IA**: Haz clic en "Analizar este medicamento con IA" para obtener un análisis de tendencias del medicamento seleccionado.
+5. **Análisis manual**: Ingresa un nombre en la sección "Análisis de tendencias manual" para analizar cualquier medicamento.
+""")
+
 st.sidebar.header("Carga tus datos")
 uploaded_file = st.sidebar.file_uploader("Sube un archivo CSV con datos de ventas", type=["csv"])
 
