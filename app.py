@@ -13,9 +13,8 @@ st.title("PharmaTrend Analyzer")
 st.subheader("Analiza tendencias de mercado para la industria farmacéutica")
 
 # --- Manejo de la API Key con Streamlit Secrets ---
-# Para usar esto, debes agregar tu API Key en un archivo `.streamlit/secrets.toml` con el formato:
 # [secrets]
-# API_KEY = "tu_clave_aqui"
+# API_KEY = "tu_clave_aqui" en .streamlit/secrets.toml
 API_KEY = st.secrets["API_KEY"]
 
 # --- Función para llamar a la API de Gemini ---
@@ -51,6 +50,9 @@ def call_gemini_api(prompt):
 st.sidebar.header("Carga tus datos")
 uploaded_file = st.sidebar.file_uploader("Sube un archivo CSV con datos de ventas", type=["csv"])
 
+# Variable para almacenar el DataFrame
+data = None
+
 if uploaded_file is not None:
     # Leer el archivo CSV
     data = pd.read_csv(uploaded_file)
@@ -60,21 +62,64 @@ if uploaded_file is not None:
     st.write("Vista previa de los datos:")
     st.dataframe(data.head())
 
-    # Suponiendo que el CSV tiene columnas como "Fecha", "Medicamento", "Ventas"
-    if "Fecha" in data.columns and "Ventas" in data.columns:
-        # Gráfico de tendencias
-        fig = px.line(data, x="Fecha", y="Ventas", title="Tendencias de Ventas", 
-                      labels={"Ventas": "Ventas (unidades)", "Fecha": "Fecha"})
-        st.plotly_chart(fig, use_container_width=True)
+    # --- Filtros y Menú Desplegable ---
+    st.header("Explora los Medicamentos")
+    if "Drug_Name" in data.columns and "Sales_2024 (USD)" in data.columns:
+        # Filtro por rango de ventas
+        min_sales = st.sidebar.slider("Ventas mínimas (millones USD)", 
+                                      float(data["Sales_2024 (USD)"].min()), 
+                                      float(data["Sales_2024 (USD)"].max()), 
+                                      float(data["Sales_2024 (USD)"].min()))
+        max_sales = st.sidebar.slider("Ventas máximas (millones USD)", 
+                                      float(data["Sales_2024 (USD)"].min()), 
+                                      float(data["Sales_2024 (USD)"].max()), 
+                                      float(data["Sales_2024 (USD)"].max()))
+        
+        # Filtrar datos según el rango de ventas
+        filtered_data = data[(data["Sales_2024 (USD)"] >= min_sales) & 
+                             (data["Sales_2024 (USD)"] <= max_sales)]
+        
+        st.write(f"Medicamentos filtrados: {len(filtered_data)}")
+        st.dataframe(filtered_data)
 
-# --- Sección de análisis de tendencias con la API ---
-st.header("Análisis de tendencias")
-medicamento = st.text_input("Ingresa el nombre de un medicamento para analizar tendencias", "Ibuprofeno")
+        # Menú desplegable con los medicamentos filtrados
+        medicamentos = filtered_data["Drug_Name"].tolist()
+        medicamento_seleccionado = st.selectbox("Elige un medicamento:", medicamentos)
+        
+        # Mostrar datos del medicamento seleccionado
+        if medicamento_seleccionado:
+            datos_medicamento = filtered_data[filtered_data["Drug_Name"] == medicamento_seleccionado]
+            st.write("Datos del medicamento seleccionado:")
+            st.dataframe(datos_medicamento)
+            
+            # Gráfico de las ventas
+            fig = px.bar(
+                datos_medicamento, 
+                x="Drug_Name", 
+                y="Sales_2024 (USD)", 
+                title=f"Ventas de {medicamento_seleccionado} en 2024",
+                labels={"Sales_2024 (USD)": "Ventas (millones USD)"},
+                text=datos_medicamento["Sales_2024 (USD)"].apply(lambda x: f"{x:.2f}")
+            )
+            fig.update_traces(textposition='auto')  # Mostrar valores en las barras
+            st.plotly_chart(fig, use_container_width=True)
 
-if st.button("Analizar"):
-    prompt = f"Proporciona un análisis breve de las tendencias actuales del medicamento '{medicamento}' en la industria farmacéutica."
+            # Botón para analizar con la API de Gemini
+            if st.button("Analizar este medicamento con IA"):
+                prompt = f"Proporciona un análisis breve de las tendencias actuales del medicamento '{medicamento_seleccionado}' en la industria farmacéutica."
+                resultado = call_gemini_api(prompt)
+                if resultado:
+                    st.write("Análisis de tendencias:")
+                    st.write(resultado)
+    else:
+        st.error("El archivo CSV debe contener las columnas 'Drug_Name' y 'Sales_2024 (USD)'.")
+
+# --- Sección de análisis manual con la API ---
+st.header("Análisis de tendencias manual")
+medicamento_input = st.text_input("Ingresa el nombre de un medicamento para analizar tendencias", "Ibuprofeno")
+if st.button("Analizar manualmente"):
+    prompt = f"Proporciona un análisis breve de las tendencias actuales del medicamento '{medicamento_input}' en la industria farmacéutica."
     resultado = call_gemini_api(prompt)
-    
     if resultado:
         st.write("Resultado del análisis:")
         st.write(resultado)
